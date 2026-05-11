@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototype 2 Skinwalker ranch</title>
+
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <link rel="stylesheet" href="./css/main.css">
+    <style>
+        @keyframes scaleAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="popup">
+    <div id="popup-content">
+        <p> <strong>Kies een campagnenummer en scan <br> de achterkant van jouw personakaart.</strong> </p>
+        <select id="campaignInput">
+            <option value="" disabled selected>Kies een campagnenummer</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+        </select>
+        <button id="klaarBtn" type="button">klaar</button>
+    </div>
+</div>
+
+<div id="skinwalkerWarning" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background-color: rgba(255,0,0,0.5); padding: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.3); flex-direction: column; align-items: center; text-align: center; max-width: 90vw;">
+    <img src="./images/warning_SKINWALKER.png" alt="Skinwalker Warning" style="width: 420px; max-width: 100%; height: auto; animation: scaleAnimation 2s infinite;">
+    <div class="preloader"></div>
+    <p style="margin: 0; color: #fff;">Doorverwijzen naar persona...</p>
+</div>
+
+<div id="trespasserWarning" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background-color: rgba(20,120,20,0.85); padding: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.3); flex-direction: column; align-items: center; text-align: center; max-width: 90vw;">
+    <div style="font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 14px;">Je bent een trespasser</div>
+    <div class="preloader"></div>
+    <p style="margin: 0; color: #eef;">Doorverwijzen naar persona...</p>
+</div>
+
+    <a-scene id="scene"
+        mindar-image="imageTargetSrc: ./assets/targets.mind; maxTrack: 4" 
+        color-space="sRGB" 
+        renderer="colorManagement: true, physicallyCorrectLights"
+        device-orientation-permission-ui="enabled: false"
+        vr-mode-ui="enabled: false"
+    >
+
+        <a-assets>
+            <a-asset-item></a-asset-item>
+        </a-assets>
+
+        <a-entity mindar-image-target="targetIndex: 0" data-index="0" data-character="jed"></a-entity>
+
+    <a-entity mindar-image-target="targetIndex: 1" data-index="1" data-character="igmar"></a-entity>
+
+    <a-entity mindar-image-target="targetIndex: 2" data-index="2" data-character="earl"></a-entity>
+
+    <a-entity mindar-image-target="targetIndex: 3" data-index="3" data-character="brooke"></a-entity>
+
+    <a-entity mindar-image-target="targetIndex: 4" data-index="4" data-character="priscilla"></a-entity>
+
+    <a-entity mindar-image-target="targetIndex: 5" data-index="5" data-character="erika"></a-entity>
+
+
+
+
+
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    </a-scene>
+
+<script>
+let campaign;
+
+const sceneEl = document.getElementById('scene');
+const popupEl = document.getElementById('popup');
+
+const targetEntities = document.querySelectorAll('a-entity[mindar-image-target]');
+
+targetEntities.forEach((entity) => {
+    entity.addEventListener('targetFound', () => {
+        if (!campaign || campaign < 1 || campaign > 6) {
+            alert('Kies eerst een geldig campagnenummer.');
+            return;
+        }
+        const skinwalkerIndex = campaign - 1;
+        const targetIndex = Number(entity.dataset.index);
+        const character = entity.dataset.character;
+        const isSkinwalker = targetIndex === skinwalkerIndex;
+        const url = `${character}.html?skinwalker=${isSkinwalker}`;
+        const warningEl = document.getElementById(isSkinwalker ? 'skinwalkerWarning' : 'trespasserWarning');
+        warningEl.style.display = 'flex';
+        setTimeout(() => {
+            warningEl.style.display = 'none';
+            window.location.href = url;
+        }, 5000);
+    });
+});
+
+document.getElementById('klaarBtn').addEventListener('click', () => {
+    const input = document.getElementById('campaignInput');
+    campaign = parseInt(input.value, 10);
+    if (campaign >= 1 && campaign <= 6) {
+        popupEl.style.display = 'none';
+        sceneEl.style.display = 'block';
+    } else {
+        alert('Voer een geldig campagnenummer in (1-6)');
+    }
+});
+</script>
+
+</body>
+</html>
