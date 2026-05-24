@@ -14,11 +14,10 @@ class InventoryManager {
         this.animationId = null;
         this.easing = 0.92; // Friction factor
         this.minVelocity = 0.1;
-        this.isDragging = false;
-        this.dragThreshold = 5;
+        this.dragThreshold = 5; // pixels moved to consider it a drag
         this.hasMoved = false;
         
-        // Bind methods to preserve context
+        // Bind methods to preserve 'this' context
         this.onDragMove = this.onDragMove.bind(this);
         this.onDragEnd = this.onDragEnd.bind(this);
     }
@@ -36,7 +35,7 @@ class InventoryManager {
         if (this.items.length === 0) return;
 
         // Set initial random positions and rotations
-        this.items.forEach((item, index) => {
+        this.items.forEach((item) => {
             this.setRandomPosition(item, container);
             this.attachItemListeners(item);
         });
@@ -67,7 +66,7 @@ class InventoryManager {
 
     attachItemListeners(item) {
         item.addEventListener('mousedown', (e) => this.onDragStart(e, item));
-        item.addEventListener('touchstart', (e) => this.onDragStart(e, item), { passive: true });
+        item.addEventListener('touchstart', (e) => this.onDragStart(e, item), { passive: false });
         
         // Click to lightbox (if not dragged)
         item.addEventListener('click', (e) => {
@@ -78,11 +77,13 @@ class InventoryManager {
     }
 
     onDragStart(e, item) {
-        if (e.type === 'touchstart' && e.touches.length !== 1) return;
+        // Don't prevent default for touch to allow native scrolling initially
+        if (e.type !== 'touchstart') {
+            e.preventDefault();
+        }
         
-        this.hasMoved = false;
-        this.isDragging = true;
         this.draggingItem = item;
+        this.hasMoved = false;
         item.classList.add('dragging');
 
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
@@ -95,7 +96,7 @@ class InventoryManager {
         this.lastX = clientX;
         this.lastY = clientY;
 
-        // Add bound event listeners
+        // Add event listeners with proper context
         document.addEventListener('mousemove', this.onDragMove);
         document.addEventListener('touchmove', this.onDragMove, { passive: false });
         document.addEventListener('mouseup', this.onDragEnd);
@@ -104,9 +105,6 @@ class InventoryManager {
 
     onDragMove(e) {
         if (!this.draggingItem) return;
-        if (e.type === 'touchmove' && e.touches.length !== 1) return;
-        
-        e.preventDefault();
 
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
         const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
@@ -114,10 +112,13 @@ class InventoryManager {
         const deltaX = clientX - this.dragStartX;
         const deltaY = clientY - this.dragStartY;
 
-        // Check if we've moved beyond threshold
+        // Check if movement exceeds threshold
         if (Math.abs(deltaX) > this.dragThreshold || Math.abs(deltaY) > this.dragThreshold) {
             this.hasMoved = true;
+            e.preventDefault();
         }
+
+        if (!this.hasMoved) return;
 
         this.velocityX = clientX - this.lastX;
         this.velocityY = clientY - this.lastY;
@@ -137,16 +138,16 @@ class InventoryManager {
 
         const item = this.draggingItem;
         item.classList.remove('dragging');
-        
-        // Apply easing/inertia if item was actually moved
+
+        // Apply easing if item was moved
         if (this.hasMoved) {
             this.applyEasing(item);
         }
 
-        this.isDragging = false;
         this.draggingItem = null;
+        this.hasMoved = false;
 
-        // Remove bound event listeners
+        // Remove event listeners
         document.removeEventListener('mousemove', this.onDragMove);
         document.removeEventListener('touchmove', this.onDragMove);
         document.removeEventListener('mouseup', this.onDragEnd);
@@ -155,6 +156,8 @@ class InventoryManager {
 
     applyEasing(item) {
         const container = document.querySelector('.inventory-items');
+        if (!container) return;
+
         const containerWidth = container.offsetWidth;
         const containerHeight = container.offsetHeight;
         const itemWidth = item.offsetWidth;
@@ -212,14 +215,12 @@ class InventoryManager {
         overlay.innerHTML = `
             <div class="inventory-lightbox-content">
                 <img class="inventory-lightbox-image" src="" alt="">
-                <button class="inventory-lightbox-close" type="button">✕</button>
+                <button class="inventory-lightbox-close">✕</button>
             </div>
         `;
 
         document.body.appendChild(overlay);
 
-        const closeBtn = overlay.querySelector('.inventory-lightbox-close');
-        
         // Close on overlay click
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
@@ -228,18 +229,15 @@ class InventoryManager {
         });
 
         // Close on close button click
-        closeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        overlay.querySelector('.inventory-lightbox-close').addEventListener('click', (e) => {
+            e.preventDefault();
             this.closeLightbox();
         });
 
         // Close on ESC key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const overlay = document.querySelector('.inventory-lightbox-overlay');
-                if (overlay && overlay.classList.contains('active')) {
-                    this.closeLightbox();
-                }
+            if (e.key === 'Escape' && overlay.classList.contains('active')) {
+                this.closeLightbox();
             }
         });
     }
