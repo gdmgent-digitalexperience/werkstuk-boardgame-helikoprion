@@ -14,12 +14,6 @@ class InventoryManager {
         this.animationId = null;
         this.easing = 0.92; // Friction factor
         this.minVelocity = 0.1;
-        this.dragThreshold = 5; // pixels moved to consider it a drag
-        this.hasMoved = false;
-        
-        // Bind methods to preserve 'this' context
-        this.onDragMove = this.onDragMove.bind(this);
-        this.onDragEnd = this.onDragEnd.bind(this);
     }
 
     init() {
@@ -35,7 +29,7 @@ class InventoryManager {
         if (this.items.length === 0) return;
 
         // Set initial random positions and rotations
-        this.items.forEach((item) => {
+        this.items.forEach((item, index) => {
             this.setRandomPosition(item, container);
             this.attachItemListeners(item);
         });
@@ -66,26 +60,22 @@ class InventoryManager {
 
     attachItemListeners(item) {
         item.addEventListener('mousedown', (e) => this.onDragStart(e, item));
-        item.addEventListener('touchstart', (e) => this.onDragStart(e, item), { passive: false });
+        item.addEventListener('touchstart', (e) => this.onDragStart(e, item));
         
         // Click to lightbox (if not dragged)
         item.addEventListener('click', (e) => {
-            if (!this.hasMoved) {
+            if (!this.draggingItem) {
                 this.openLightbox(item.src);
             }
         });
     }
 
     onDragStart(e, item) {
-        // Don't prevent default for touch to allow native scrolling initially
-        if (e.type !== 'touchstart') {
-            e.preventDefault();
-        }
-        
+        e.preventDefault();
         this.draggingItem = item;
-        this.hasMoved = false;
         item.classList.add('dragging');
 
+        const rect = item.getBoundingClientRect();
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
         const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
 
@@ -96,29 +86,21 @@ class InventoryManager {
         this.lastX = clientX;
         this.lastY = clientY;
 
-        // Add event listeners with proper context
-        document.addEventListener('mousemove', this.onDragMove);
-        document.addEventListener('touchmove', this.onDragMove, { passive: false });
-        document.addEventListener('mouseup', this.onDragEnd);
-        document.addEventListener('touchend', this.onDragEnd);
+        document.addEventListener('mousemove', (e) => this.onDragMove(e));
+        document.addEventListener('touchmove', (e) => this.onDragMove(e), { passive: false });
+        document.addEventListener('mouseup', (e) => this.onDragEnd(e));
+        document.addEventListener('touchend', (e) => this.onDragEnd(e));
     }
 
     onDragMove(e) {
         if (!this.draggingItem) return;
+        e.preventDefault();
 
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
         const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
 
         const deltaX = clientX - this.dragStartX;
         const deltaY = clientY - this.dragStartY;
-
-        // Check if movement exceeds threshold
-        if (Math.abs(deltaX) > this.dragThreshold || Math.abs(deltaY) > this.dragThreshold) {
-            this.hasMoved = true;
-            e.preventDefault();
-        }
-
-        if (!this.hasMoved) return;
 
         this.velocityX = clientX - this.lastX;
         this.velocityY = clientY - this.lastY;
@@ -138,26 +120,20 @@ class InventoryManager {
 
         const item = this.draggingItem;
         item.classList.remove('dragging');
-
-        // Apply easing if item was moved
-        if (this.hasMoved) {
-            this.applyEasing(item);
-        }
-
         this.draggingItem = null;
-        this.hasMoved = false;
+
+        // Apply easing/inertia
+        this.applyEasing(item);
 
         // Remove event listeners
-        document.removeEventListener('mousemove', this.onDragMove);
-        document.removeEventListener('touchmove', this.onDragMove);
-        document.removeEventListener('mouseup', this.onDragEnd);
-        document.removeEventListener('touchend', this.onDragEnd);
+        document.removeEventListener('mousemove', (e) => this.onDragMove(e));
+        document.removeEventListener('touchmove', (e) => this.onDragMove(e));
+        document.removeEventListener('mouseup', (e) => this.onDragEnd(e));
+        document.removeEventListener('touchend', (e) => this.onDragEnd(e));
     }
 
     applyEasing(item) {
         const container = document.querySelector('.inventory-items');
-        if (!container) return;
-
         const containerWidth = container.offsetWidth;
         const containerHeight = container.offsetHeight;
         const itemWidth = item.offsetWidth;
@@ -229,8 +205,7 @@ class InventoryManager {
         });
 
         // Close on close button click
-        overlay.querySelector('.inventory-lightbox-close').addEventListener('click', (e) => {
-            e.preventDefault();
+        overlay.querySelector('.inventory-lightbox-close').addEventListener('click', () => {
             this.closeLightbox();
         });
 
