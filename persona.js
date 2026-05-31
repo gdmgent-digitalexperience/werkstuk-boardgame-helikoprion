@@ -14,6 +14,12 @@ class InventoryManager {
         this.animationId = null;
         this.easing = 0.92; // Friction factor
         this.minVelocity = 0.1;
+        this.dragThreshold = 10; // Minimum pixels to consider it a drag
+        this.hasMoved = false; // Track if item actually moved
+        
+        // Bind methods to preserve 'this' context
+        this.onDragMove = this.onDragMove.bind(this);
+        this.onDragEnd = this.onDragEnd.bind(this);
     }
 
     init() {
@@ -61,21 +67,13 @@ class InventoryManager {
     attachItemListeners(item) {
         item.addEventListener('mousedown', (e) => this.onDragStart(e, item));
         item.addEventListener('touchstart', (e) => this.onDragStart(e, item));
-        
-        // Click to lightbox (if not dragged)
-        item.addEventListener('click', (e) => {
-            if (!this.draggingItem) {
-                this.openLightbox(item.src);
-            }
-        });
     }
 
     onDragStart(e, item) {
-        e.preventDefault();
         this.draggingItem = item;
+        this.hasMoved = false;
         item.classList.add('dragging');
 
-        const rect = item.getBoundingClientRect();
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
         const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
 
@@ -86,21 +84,30 @@ class InventoryManager {
         this.lastX = clientX;
         this.lastY = clientY;
 
-        document.addEventListener('mousemove', (e) => this.onDragMove(e));
-        document.addEventListener('touchmove', (e) => this.onDragMove(e), { passive: false });
-        document.addEventListener('mouseup', (e) => this.onDragEnd(e));
-        document.addEventListener('touchend', (e) => this.onDragEnd(e));
+        // Attach move and end listeners
+        document.addEventListener('mousemove', this.onDragMove);
+        document.addEventListener('touchmove', this.onDragMove, { passive: false });
+        document.addEventListener('mouseup', this.onDragEnd);
+        document.addEventListener('touchend', this.onDragEnd);
     }
 
     onDragMove(e) {
         if (!this.draggingItem) return;
-        e.preventDefault();
 
         const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
         const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
 
         const deltaX = clientX - this.dragStartX;
         const deltaY = clientY - this.dragStartY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // Only consider it a drag if movement exceeds threshold
+        if (distance > this.dragThreshold) {
+            this.hasMoved = true;
+            e.preventDefault();
+        }
+
+        if (!this.hasMoved) return;
 
         this.velocityX = clientX - this.lastX;
         this.velocityY = clientY - this.lastY;
@@ -119,17 +126,26 @@ class InventoryManager {
         if (!this.draggingItem) return;
 
         const item = this.draggingItem;
-        item.classList.remove('dragging');
-        this.draggingItem = null;
+        const wasMoved = this.hasMoved;
 
-        // Apply easing/inertia
-        this.applyEasing(item);
+        item.classList.remove('dragging');
+
+        // If it was just a tap (no movement), open lightbox
+        if (!wasMoved) {
+            this.openLightbox(item.src);
+        } else {
+            // Apply easing/inertia only if it was dragged
+            this.applyEasing(item);
+        }
+
+        this.draggingItem = null;
+        this.hasMoved = false;
 
         // Remove event listeners
-        document.removeEventListener('mousemove', (e) => this.onDragMove(e));
-        document.removeEventListener('touchmove', (e) => this.onDragMove(e));
-        document.removeEventListener('mouseup', (e) => this.onDragEnd(e));
-        document.removeEventListener('touchend', (e) => this.onDragEnd(e));
+        document.removeEventListener('mousemove', this.onDragMove);
+        document.removeEventListener('touchmove', this.onDragMove);
+        document.removeEventListener('mouseup', this.onDragEnd);
+        document.removeEventListener('touchend', this.onDragEnd);
     }
 
     applyEasing(item) {
